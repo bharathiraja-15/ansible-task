@@ -2,60 +2,71 @@ provider "aws" {
   region = "ap-south-1"
 }
 
-resource "aws_instance" "backend" { #ubuntu.yaml NETADATA
-  ami                    = "ami-0d176f79571d18a8f"
-  instance_type          = "t3.micro" 
-  key_name               = "mumbai"
-  vpc_security_group_ids = ["sg-00318350619b1ae2b"]
-  subnet_id = "subnet-0d0eb30adae1d3565"
-  tags = {
-    Name = "u21.local"
-  }
-  user_data = <<-EOF
-  #!/bin/bash
-  sudo hostnamectl set-hostname U21.local
-  # netdata_conf="/etc/netdata/netdata.conf"
-  # Path to netdata.conf
-  # actual_ip=0.0.0.0
-  # Use sed to replace the IP address in netdata.conf
-  # sudo sed -i "s/bind socket to IP = .*$/bind socket to IP = $actual_ip/" "$netdata_conf"
-EOF
-
-}
-
-resource "aws_instance" "frontend" { #amazon-playbook.yaml NGINX
-  ami                    = "ami-0d176f79571d18a8f"
+# ---------------------------
+# Backend - Ubuntu
+# ---------------------------
+resource "aws_instance" "backend" {
+  ami                    = "ami-02b8269d5e85954ef"  
   instance_type          = "t3.micro"
   key_name               = "mumbai"
   vpc_security_group_ids = ["sg-00318350619b1ae2b"]
-  subnet_id = "subnet-024f6df68d098d6ac"
+  subnet_id              = "subnet-0d0eb30adae1d3565"
+
+  tags = {
+    Name = "u21.local"
+  }
+
+  user_data = <<-EOF
+    #!/bin/bash
+    sudo hostnamectl set-hostname u21.local
+  EOF
+}
+
+# ---------------------------
+# Frontend - Amazon Linux
+# ---------------------------
+resource "aws_instance" "frontend" {
+  ami                    = "ami-0d176f79571d18a8f"   # Amazon Linux
+  instance_type          = "t3.micro"
+  key_name               = "mumbai"
+  vpc_security_group_ids = ["sg-00318350619b1ae2b"]
+  subnet_id              = "subnet-024f6df68d098d6ac"
+
   tags = {
     Name = "c8.local"
   }
+
   user_data = <<-EOF
-  #!/bin/bash
-  # New hostname and IP address
-  sudo hostnamectl set-hostname u21.local
-  hostname=$(hostname)
-  public_ip="$(curl -s https://api64.ipify.org?format=json | jq -r .ip)"
+    #!/bin/bash
+    sudo hostnamectl set-hostname c8.local
 
-  # Path to /etc/hosts
-  echo "${aws_instance.backend.public_ip} $hostname" | sudo tee -a /etc/hosts
+    hostname=$(hostname)
+    backend_ip="${aws_instance.backend.public_ip}"
 
-EOF
-depends_on = [aws_instance.backend]
+    echo "$backend_ip $hostname" | sudo tee -a /etc/hosts
+  EOF
+
+  depends_on = [aws_instance.backend]
 }
 
+# ---------------------------
+# Inventory file
+# ---------------------------
 resource "local_file" "inventory" {
   filename = "./inventory.yaml"
-  content  = <<EOF
+
+  content = <<EOF
 [frontend]
 ${aws_instance.frontend.public_ip}
+
 [backend]
 ${aws_instance.backend.public_ip}
 EOF
 }
 
+# ---------------------------
+# Outputs
+# ---------------------------
 output "frontend_public_ip" {
   value = aws_instance.frontend.public_ip
 }
