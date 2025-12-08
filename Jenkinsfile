@@ -16,6 +16,7 @@ pipeline {
                     dir("${WORKSPACE}") {
                         sh 'terraform init'
                         sh 'terraform validate'
+
                         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
                             sh 'terraform plan'
                             sh 'terraform apply -auto-approve'
@@ -27,33 +28,34 @@ pipeline {
 
         stage('Ansible Deployment') {
             steps {
-                    script {
-                        ansiblePlaybook(
-                            credentialsId: 'ec2-key', 
-                            disableHostKeyChecking: true,
-                            installation: 'ansible',
-                            inventory: 'inventory.yaml',
-                            playbook: 'amazon-playbook.yml'
-                            extraVars: [
-                                ansible_user: "ec2-user"
-                            ]
-                        )
+                script {
 
-                        ansiblePlaybook(
-                            become: true,
-                            credentialsId: 'ec2-key',
-                            disableHostKeyChecking: true,
-                            installation: 'ansible',
-                            inventory: 'inventory.yaml',
-                            playbook: 'ubuntu-playbook.yml'
-                            extraVars: [
-                                ansible_user: "ec2-user"
-                            ]
-                        )
-                    }
+                    // --- AMAZON LINUX (frontend) ---
+                    ansiblePlaybook(
+                        credentialsId: 'ec2-key',
+                        disableHostKeyChecking: true,
+                        installation: 'ansible',
+                        inventory: 'inventory.yaml',
+                        playbook: 'amazon-playbook.yml',
+                        extraVars: [
+                            ansible_user: "ec2-user"   // <-- Correct SSH user
+                        ]
+                    )
+
+                    // --- UBUNTU (backend, only if needed) ---
+                    ansiblePlaybook(
+                        become: true,
+                        credentialsId: 'ec2-key',
+                        disableHostKeyChecking: true,
+                        installation: 'ansible',
+                        inventory: 'inventory.yaml',
+                        playbook: 'ubuntu-playbook.yml',
+                        extraVars: [
+                            ansible_user: "ubuntu"     // <-- Ubuntu default user
+                        ]
+                    )
+                }
             }
         }
-
     }
 }
-
