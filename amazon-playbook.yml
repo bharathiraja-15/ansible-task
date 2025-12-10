@@ -3,7 +3,7 @@
   become: yes
 
   tasks:
-    - name: Ensure DNF cache is updated
+    - name: Update DNF cache
       dnf:
         update_cache: yes
 
@@ -30,4 +30,4 @@
     - name: restart nginx
       service:
         name: nginx
-        state: restarted
+        state: resta

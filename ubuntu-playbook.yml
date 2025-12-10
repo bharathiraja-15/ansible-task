@@ -30,13 +30,4 @@
 
     - name: Update netdata.conf to listen on 0.0.0.0
       lineinfile:
-        path: /etc/netdata/netdata.conf
-        regexp: '^#?bind socket to IP ='
-        line: 'bind socket to IP = 0.0.0.0'
-      notify: restart netdata
-
-  handlers:
-    - name: restart netdata
-      service:
-        name: netdata
-        state: restarted
+        path: /etc/netdata/netda

@@ -9,22 +9,28 @@ http {
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
 
-    sendfile        on;
+    sendfile on;
     keepalive_timeout 65;
 
-    upstream backend_app {
-        server {{ hostvars['backend']['ansible_host'] | default('127.0.0.1') }}:8080;
+    upstream backend_netdata {
+        server {{ hostvars['backend']['ansible_host'] }}:19999;
     }
 
     server {
         listen 80;
+        server_name _;
 
         location / {
-            proxy_pass http://backend_app;
+            proxy_pass http://backend_netdata;
+            proxy_http_version 1.1;
+
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
         }
     }
 }
