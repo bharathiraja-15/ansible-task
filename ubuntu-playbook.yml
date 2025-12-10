@@ -3,7 +3,6 @@
   become: yes
 
   tasks:
-
     - name: Install required packages
       apt:
         name:
@@ -16,7 +15,7 @@
       get_url:
         url: "https://my-netdata.io/kickstart.sh"
         dest: "/tmp/netdata-install.sh"
-        mode: 0755
+        mode: '0755'
 
     - name: Run Netdata installer (non-interactive)
       command: "bash /tmp/netdata-install.sh --non-interactive"
