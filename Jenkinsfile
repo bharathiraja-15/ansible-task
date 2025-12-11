@@ -59,7 +59,7 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
         ansiblePlaybook(
             playbook: 'amazon-playbook.yml',
             inventory: 'ansible/inventory.ini',
-            credentialsId: 'jenkins-key',
+            credentialsId: 'firstserver-key',
             disableHostKeyChecking: true,
             become: true
         )
@@ -71,7 +71,7 @@ stage('Run Ansible - Backend') {
         ansiblePlaybook(
             playbook: 'ubuntu-playbook.yml',
             inventory: 'ansible/inventory.ini',
-            credentialsId: 'jenkins-key',
+            credentialsId: 'firstserver-key',
             disableHostKeyChecking: true,
             become: true
         )
