@@ -84,6 +84,7 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
                     credentialsId: 'firstserver',
                     disableHostKeyChecking: true,
                     become: true
+                    extras: '-u ubuntu'
                 )
             }
         }
