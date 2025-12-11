@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        TF_VAR_key_name = 'firstserver','firstserver-key'
+        TF_VAR_key_name = 'firstserver-key'
     }
 
     stages {
@@ -64,19 +64,20 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
             }
         }
 
-        stage('Run Ansible - Frontend') {
-            steps {
-                ansiblePlaybook(
-                    playbook: 'amazon-playbook.yml',
-                    inventory: 'ansible/inventory.ini',
-                    credentialsId: 'firstserver',
-                    disableHostKeyChecking: true,
-                    become: true
-                )
-            }
-        }
+  stage('Run Ansible - Frontend') {
+    steps {
+        ansiblePlaybook(
+            playbook: 'amazon-playbook.yml',
+            inventory: 'ansible/inventory.ini',
+            credentialsId: 'firstserver-key',
+            disableHostKeyChecking: true,
+            become: true,
+            extras: '-u ec2-user'
+        )
+    }
+}
 
-       stage('Run Ansible - Backend') {
+stage('Run Ansible - Backend') {
     steps {
         ansiblePlaybook(
             playbook: 'ubuntu-playbook.yml',
@@ -88,6 +89,7 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
         )
     }
 }
+
 
         stage('Post-checks') {
             steps {
