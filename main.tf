@@ -4,7 +4,7 @@ provider "aws" {
 
 variable "key_name" {
   type    = string
-  default = "jenkins"
+  default = "firstserver"
 }
 
 variable "subnet_id" {
