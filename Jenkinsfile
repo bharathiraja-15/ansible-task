@@ -81,7 +81,7 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
         ansiblePlaybook(
             playbook: 'ubuntu-playbook.yml',
             inventory: 'ansible/inventory.ini',
-            credentialsId: 'firstserver-key',
+            credentialsId: 'firstserver',
             disableHostKeyChecking: true,
             become: true,
             extras: '-u ubuntu'
