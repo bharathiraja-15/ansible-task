@@ -58,8 +58,8 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
             steps {
                 sh '''
                     echo "Listing workspace files:"
-                    ls -l /var/lib/jenkins/workspace/${JOB_NAME}/ || true
-                    ls -l /var/lib/jenkins/workspace/${JOB_NAME}/*.key || true
+                    ls -l /var/lib/jenkins/workspace/${AC_2}/ || true
+                    ls -l /var/lib/jenkins/workspace/${AC_2}/*.key || true
                 '''
             }
         }
