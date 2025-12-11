@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "us-east-1"
+  region = "eu-north-1"
 }
 
 variable "key_name" {
@@ -9,7 +9,7 @@ variable "key_name" {
 
 variable "subnet_id" {
   type    = string
-  default = "subnet-0398cec97156f1f60"
+  default = "subnet-0d91e8fd1fa2524c9"
 }
 
 variable "jenkins_allowed_cidr" {
@@ -70,7 +70,7 @@ resource "aws_security_group" "app_sg" {
 # Backend (Ubuntu)
 # ---------------------------
 resource "aws_instance" "backend" {
-  ami                         = "ami-0ecb62995f68bb549"
+  ami                         = "ami-0b46816ffa1234887"
   instance_type               = "t3.micro"
   key_name                    = var.key_name
   subnet_id                   = var.subnet_id
@@ -91,7 +91,7 @@ EOF
 # Frontend (Amazon Linux)
 # ---------------------------
 resource "aws_instance" "frontend" {
-  ami                         = "ami-068c0051b15cdb816"
+  ami                         = "ami-0b46816ffa1234887"
   instance_type               = "t3.micro"
   key_name                    = var.key_name
   subnet_id                   = var.subnet_id
