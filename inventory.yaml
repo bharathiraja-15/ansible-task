@@ -1,7 +1,7 @@
 content = <<EOF
 [frontend]
-${aws_instance.frontend.public_ip} ansible_user=ec2-user ansible_host=${aws_instance.frontend.public_ip}
+frontend ansible_host=${aws_instance.frontend.public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=./firstserver.pem
 
 [backend]
-${aws_instance.backend.public_ip} ansible_user=ubuntu ansible_host=${aws_instance.backend.public_ip}
+backend ansible_host=${aws_instance.backend.public_ip} ansible_user=ec2-user ansible_ssh_private_key_file=./firstserver.pem
 EOF
