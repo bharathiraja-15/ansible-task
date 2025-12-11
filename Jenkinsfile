@@ -76,19 +76,18 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
             }
         }
 
-        stage('Run Ansible - Backend') {
-            steps {
-                ansiblePlaybook(
-                    playbook: 'ubuntu-playbook.yml',
-                    inventory: 'ansible/inventory.ini',
-                    credentialsId: 'firstserver',
-                    disableHostKeyChecking: true,
-                    become: true
-                    extras: '-u ubuntu'
-                )
-            }
-        }
-
+       stage('Run Ansible - Backend') {
+    steps {
+        ansiblePlaybook(
+            playbook: 'ubuntu-playbook.yml',
+            inventory: 'ansible/inventory.ini',
+            credentialsId: 'firstserver',
+            disableHostKeyChecking: true,
+            become: true,
+            extras: '-u ubuntu'
+        )
+    }
+}
         stage('Post-checks') {
             steps {
                 script {
