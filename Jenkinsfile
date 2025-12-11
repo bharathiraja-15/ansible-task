@@ -54,30 +54,47 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
             }
         }
 
-       stage('Run Ansible - Frontend') {
-    steps {
-        ansiblePlaybook(
-            playbook: 'amazon-playbook.yml',
-            inventory: 'ansible/inventory.ini',
-            credentialsId: 'firstserver-key',
-            disableHostKeyChecking: true,
-            become: true
-        )
-    }
-}
+        /************** DEBUG SSH KEY STAGE **************/
+        stage('Debug SSH Key') {
+            steps {
+                sh '''
+                    echo "Searching for temporary SSH key files..."
+                    ls -l /var/lib/jenkins/workspace/${JOB_NAME}/ || true
+                    ls -l /var/lib/jenkins/workspace/${JOB_NAME}/*.key || true
 
-stage('Run Ansible - Backend') {
-    steps {
-        ansiblePlaybook(
-            playbook: 'ubuntu-playbook.yml',
-            inventory: 'ansible/inventory.ini',
-            credentialsId: 'firstserver-key',
-            disableHostKeyChecking: true,
-            become: true
-        )
-    }
-}
+                    echo "If key exists, show first 10 lines:"
+                    head -n 10 /var/lib/jenkins/workspace/${JOB_NAME}/*.key || true
 
+                    echo "Key file type:"
+                    file /var/lib/jenkins/workspace/${JOB_NAME}/*.key || true
+                '''
+            }
+        }
+        /************************************************/
+
+        stage('Run Ansible - Frontend') {
+            steps {
+                ansiblePlaybook(
+                    playbook: 'amazon-playbook.yml',
+                    inventory: 'ansible/inventory.ini',
+                    credentialsId: 'firstserver-key',
+                    disableHostKeyChecking: true,
+                    become: true
+                )
+            }
+        }
+
+        stage('Run Ansible - Backend') {
+            steps {
+                ansiblePlaybook(
+                    playbook: 'ubuntu-playbook.yml',
+                    inventory: 'ansible/inventory.ini',
+                    credentialsId: 'firstserver-key',
+                    disableHostKeyChecking: true,
+                    become: true
+                )
+            }
+        }
 
         stage('Post-checks') {
             steps {
