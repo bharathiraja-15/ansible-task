@@ -62,7 +62,7 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
                     ls -l /var/lib/jenkins/workspace/${JOB_NAME}/ || true
                     ls -l /var/lib/jenkins/workspace/${JOB_NAME}/*.key || true
 
-                    echo "If key exists, show first 10 lines:"
+                    echo "Showing first 10 lines of key:"
                     head -n 10 /var/lib/jenkins/workspace/${JOB_NAME}/*.key || true
 
                     echo "Key file type:"
@@ -78,6 +78,8 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
                     playbook: 'amazon-playbook.yml',
                     inventory: 'ansible/inventory.ini',
                     credentialsId: 'firstserver-key',
+                    sshUser: 'ec2-user',
+                    installation: 'ansible',
                     disableHostKeyChecking: true,
                     become: true
                 )
@@ -90,6 +92,8 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
                     playbook: 'ubuntu-playbook.yml',
                     inventory: 'ansible/inventory.ini',
                     credentialsId: 'firstserver-key',
+                    sshUser: 'ubuntu',
+                    installation: 'ansible',
                     disableHostKeyChecking: true,
                     become: true
                 )
