@@ -14,7 +14,7 @@ pipeline {
             }
         }
 
-        stage('Terraform Init & Apply') {
+        stage('Force Recreate Instances') {
             steps {
                 dir('terraform') {
                     withCredentials([aws(
@@ -25,10 +25,14 @@ pipeline {
                         sh '''
                             export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
                             export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-
+                            
+                            echo "=== Destroying old instances ==="
+                            terraform destroy -auto-approve || true
+                            
+                            echo "=== Initializing Terraform ==="
                             terraform init -input=false
-                            terraform validate
-                            terraform plan -out=tfplan -input=false
+                            
+                            echo "=== Creating new instances with correct key ==="
                             terraform apply -input=false -auto-approve
                         '''
                     }
@@ -39,71 +43,77 @@ pipeline {
         stage('Prepare SSH Key') {
             steps {
                 script {
-                    // Extract SSH key from Jenkins credentials
                     withCredentials([sshUserPrivateKey(
                         credentialsId: 'firstserver-key',
                         keyFileVariable: 'JENKINS_SSH_KEY',
                         usernameVariable: 'SSH_USER'
                     )]) {
                         sh """
-                            echo "Preparing SSH key for Ansible..."
-                            # Copy the key to a known location
+                            echo "=== Preparing SSH Key ==="
                             cp '$JENKINS_SSH_KEY' $SSH_KEY_PATH
                             chmod 600 $SSH_KEY_PATH
                             
-                            echo "SSH key prepared at: $SSH_KEY_PATH"
-                            echo "Testing key format..."
-                            ssh-keygen -l -f $SSH_KEY_PATH || echo "Key format check failed, but continuing..."
+                            echo "SSH Key Fingerprint:"
+                            ssh-keygen -l -f $SSH_KEY_PATH || echo "Could not read key fingerprint"
                         """
                     }
                 }
             }
         }
 
-        stage('Generate Dynamic Inventory') {
+        stage('Get Instance IPs') {
             steps {
                 script {
-                    env.FRONTEND_IP = sh(returnStdout: true, script: "cd terraform && terraform output -raw frontend_public_ip").trim()
-                    env.BACKEND_IP  = sh(returnStdout: true, script: "cd terraform && terraform output -raw backend_public_ip").trim()
+                    env.FRONTEND_IP = sh(returnStdout: true, script: "cd terraform && terraform output -raw frontend_public_ip 2>/dev/null || echo 'NOT_FOUND'").trim()
+                    env.BACKEND_IP  = sh(returnStdout: true, script: "cd terraform && terraform output -raw backend_public_ip 2>/dev/null || echo 'NOT_FOUND'").trim()
                     
                     echo "Frontend IP: ${env.FRONTEND_IP}"
                     echo "Backend IP: ${env.BACKEND_IP}"
+                    
+                    if (env.FRONTEND_IP == 'NOT_FOUND' || env.BACKEND_IP == 'NOT_FOUND') {
+                        error("Could not get instance IPs. Check Terraform outputs.")
+                    }
                 }
+            }
+        }
 
+        stage('Create Inventory') {
+            steps {
                 writeFile file: 'ansible/inventory.ini', text: """
 [frontend]
-frontend ansible_host=${env.FRONTEND_IP} ansible_user=ec2-user ansible_ssh_private_key_file=${env.SSH_KEY_PATH}
+${env.FRONTEND_IP} ansible_user=ec2-user ansible_ssh_private_key_file=${env.SSH_KEY_PATH}
 
 [backend]
-backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${env.SSH_KEY_PATH}
+${env.BACKEND_IP} ansible_user=ubuntu ansible_ssh_private_key_file=${env.SSH_KEY_PATH}
 """
-                echo "Inventory generated successfully:"
+                echo "=== Inventory Created ==="
                 sh "cat ansible/inventory.ini"
             }
         }
 
-        stage('Test SSH Connectivity') {
+        stage('Test SSH Connections') {
             steps {
                 sh """
-                    echo "=== Testing SSH Connectivity ==="
-                    echo "1. Testing frontend (ec2-user@${env.FRONTEND_IP})..."
-                    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i $SSH_KEY_PATH ec2-user@${env.FRONTEND_IP} "echo 'Frontend SSH successful'" || echo "Frontend SSH failed"
+                    echo "=== Testing SSH Connections ==="
+                    
+                    echo "1. Testing Frontend (ec2-user@${env.FRONTEND_IP})..."
+                    timeout 10 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i $SSH_KEY_PATH ec2-user@${env.FRONTEND_IP} "echo 'Frontend SSH Success - Hostname: \$(hostname)'" && echo "✓ Frontend SSH OK" || echo "✗ Frontend SSH Failed"
                     
                     echo ""
-                    echo "2. Testing backend (ubuntu@${env.BACKEND_IP})..."
-                    ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i $SSH_KEY_PATH ubuntu@${env.BACKEND_IP} "echo 'Backend SSH successful'" || echo "Backend SSH failed"
+                    echo "2. Testing Backend (ubuntu@${env.BACKEND_IP})..."
+                    timeout 10 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i $SSH_KEY_PATH ubuntu@${env.BACKEND_IP} "echo 'Backend SSH Success - Hostname: \$(hostname)'" && echo "✓ Backend SSH OK" || echo "✗ Backend SSH Failed"
                     
                     echo ""
-                    echo "3. SSH key info:"
-                    ls -la $SSH_KEY_PATH
+                    echo "3. Testing with Ansible ping..."
+                    ANSIBLE_HOST_KEY_CHECKING=False ansible all -i ansible/inventory.ini -m ping --private-key=$SSH_KEY_PATH || echo "Ansible ping failed"
                 """
             }
         }
 
-        stage('Run Ansible - Frontend') {
+        stage('Configure Frontend Server') {
             steps {
                 sh """
-                    echo "=== Running Ansible on Frontend ==="
+                    echo "=== Configuring Frontend Server ==="
                     ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook \
                         amazon-playbook.yml \
                         -i ansible/inventory.ini \
@@ -111,15 +121,15 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu ansible_ssh_private_k
                         -u ec2-user \
                         -b \
                         --become-user=root \
-                        --limit frontend
+                        -v
                 """
             }
         }
 
-        stage('Run Ansible - Backend') {
+        stage('Configure Backend Server') {
             steps {
                 sh """
-                    echo "=== Running Ansible on Backend ==="
+                    echo "=== Configuring Backend Server ==="
                     ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook \
                         ubuntu-playbook.yml \
                         -i ansible/inventory.ini \
@@ -127,30 +137,59 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu ansible_ssh_private_k
                         -u ubuntu \
                         -b \
                         --become-user=root \
-                        --limit backend
+                        -v
                 """
             }
         }
 
-        stage('Post-checks') {
+        stage('Verify Deployment') {
             steps {
-                script {
-                    echo "=== Post-deployment checks ==="
-                    echo "Frontend URL → http://${env.FRONTEND_IP}"
-                    echo "Backend (Netdata) URL → http://${env.BACKEND_IP}:19999"
-
-                    sh "curl -m 5 -I http://${env.FRONTEND_IP} || echo 'Frontend curl failed'"
-                    sh "sleep 5 && curl -m 5 -I http://${env.BACKEND_IP}:19999 || echo 'Backend curl failed'"
-                }
+                sh """
+                    echo "=== Verifying Deployment ==="
+                    
+                    echo "1. Checking Frontend Nginx..."
+                    curl -s -o /dev/null -w "Frontend HTTP Status: %{http_code}\n" http://${env.FRONTEND_IP} || echo "Frontend not accessible"
+                    
+                    echo ""
+                    echo "2. Checking Backend Netdata..."
+                    curl -s -o /dev/null -w "Backend HTTP Status: %{http_code}\n" http://${env.BACKEND_IP}:19999 || echo "Backend not accessible"
+                    
+                    echo ""
+                    echo "3. Final Status:"
+                    echo "   Frontend URL: http://${env.FRONTEND_IP}"
+                    echo "   Backend URL: http://${env.BACKEND_IP}:19999"
+                """
             }
         }
     }
 
     post {
         always {
-            // Clean up the SSH key
-            sh "rm -f $SSH_KEY_PATH || true"
-            echo "Pipeline completed"
+            sh """
+                echo "=== Cleaning up ==="
+                rm -f $SSH_KEY_PATH || true
+                echo "SSH key removed"
+            """
+            echo "=== Pipeline Completed ==="
+        }
+        success {
+            echo "✅ Pipeline SUCCESS!"
+            sh """
+                echo "=== Summary ==="
+                echo "Frontend is ready at: http://${env.FRONTEND_IP}"
+                echo "Backend monitoring at: http://${env.BACKEND_IP}:19999"
+            """
+        }
+        failure {
+            echo "❌ Pipeline FAILED!"
+            sh """
+                echo "=== Debug Information ==="
+                echo "Check Terraform state:"
+                cd terraform && terraform show || true
+                echo ""
+                echo "Last 50 lines of logs:"
+                tail -50 /var/lib/jenkins/workspace/${JOB_NAME}/log || true
+            """
         }
     }
 }
