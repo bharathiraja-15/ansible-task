@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        TF_VAR_key_name = 'firstserver-key'
+        TF_VAR_key_name = 'firstserver'
     }
 
     stages {
