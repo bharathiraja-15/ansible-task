@@ -5,11 +5,6 @@ pipeline {
         TF_VAR_key_name = 'firstserver'
     }
 
-    tools {
-        terraform 'terraform'   // Jenkins → Global Tool Config → Terraform
-        ansible 'ansible'       // Jenkins → Global Tool Config → Ansible
-    }
-
     stages {
 
         stage('Checkout') {
@@ -42,12 +37,12 @@ pipeline {
 
                 writeFile file: 'ansible/inventory.ini', text: """
 [frontend]
-frontend ansible_host=${FRONTEND_IP} ansible_user=ec2-user
+frontend ansible_host=${env.FRONTEND_IP} ansible_user=ec2-user
 
 [backend]
-backend ansible_host=${BACKEND_IP} ansible_user=ubuntu
+backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
 """
-                echo "Inventory file created:"
+                echo "Inventory generated successfully"
                 sh "cat ansible/inventory.ini"
             }
         }
@@ -59,7 +54,6 @@ backend ansible_host=${BACKEND_IP} ansible_user=ubuntu
                     inventory: 'ansible/inventory.ini',
                     credentialsId: 'jenkins-key',
                     disableHostKeyChecking: true,
-                    installation: 'ansible',
                     become: true
                 )
             }
@@ -72,7 +66,6 @@ backend ansible_host=${BACKEND_IP} ansible_user=ubuntu
                     inventory: 'ansible/inventory.ini',
                     credentialsId: 'jenkins-key',
                     disableHostKeyChecking: true,
-                    installation: 'ansible',
                     become: true
                 )
             }
