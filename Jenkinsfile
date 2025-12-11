@@ -16,8 +16,15 @@ pipeline {
         stage('Terraform Init & Apply') {
             steps {
                 dir('terraform') {
-                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-access-key']]) {
+                    withCredentials([aws(
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY',
+                        credentialsId: 'aws-access-key'
+                    )]) {
                         sh '''
+                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+
                             terraform init -input=false
                             terraform validate
                             terraform plan -out=tfplan -input=false
@@ -42,7 +49,7 @@ frontend ansible_host=${env.FRONTEND_IP} ansible_user=ec2-user
 [backend]
 backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
 """
-                echo "Inventory generated successfully"
+                echo "Inventory generated successfully:"
                 sh "cat ansible/inventory.ini"
             }
         }
