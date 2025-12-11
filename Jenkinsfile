@@ -2,7 +2,12 @@ pipeline {
     agent any
 
     environment {
-        TF_VAR_key_name = 'jenkins'
+        TF_VAR_key_name = 'firstserver'
+    }
+
+    tools {
+        terraform 'terraform'   // Jenkins → Global Tool Config → Terraform
+        ansible 'ansible'       // Jenkins → Global Tool Config → Ansible
     }
 
     stages {
@@ -15,35 +20,47 @@ pipeline {
 
         stage('Terraform Init & Apply') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-                    sh '''
-                        terraform init -input=false
-                        terraform validate
-                        terraform plan -out=tfplan -input=false
-                        terraform apply -input=false -auto-approve
-                    '''
+                dir('terraform') {
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-access-key']]) {
+                        sh '''
+                            terraform init -input=false
+                            terraform validate
+                            terraform plan -out=tfplan -input=false
+                            terraform apply -input=false -auto-approve
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Wait for instances') {
+        stage('Generate Dynamic Inventory') {
             steps {
-                sh 'sleep 30'
+                script {
+                    env.FRONTEND_IP = sh(returnStdout: true, script: "cd terraform && terraform output -raw frontend_public_ip").trim()
+                    env.BACKEND_IP  = sh(returnStdout: true, script: "cd terraform && terraform output -raw backend_public_ip").trim()
+                }
+
+                writeFile file: 'ansible/inventory.ini', text: """
+[frontend]
+frontend ansible_host=${FRONTEND_IP} ansible_user=ec2-user
+
+[backend]
+backend ansible_host=${BACKEND_IP} ansible_user=ubuntu
+"""
+                echo "Inventory file created:"
+                sh "cat ansible/inventory.ini"
             }
         }
 
         stage('Run Ansible - Frontend') {
             steps {
                 ansiblePlaybook(
-                    playbook: 'amazon-playbook.yml',
-                    inventory: 'inventory.yaml',
+                    playbook: 'ansible/frontend.yml',
+                    inventory: 'ansible/inventory.ini',
                     credentialsId: 'jenkins-key',
                     disableHostKeyChecking: true,
                     installation: 'ansible',
-                    become: true,
-                    extraVars: [
-                        ansible_user: "ec2-user"
-                    ]
+                    become: true
                 )
             }
         }
@@ -51,15 +68,12 @@ pipeline {
         stage('Run Ansible - Backend') {
             steps {
                 ansiblePlaybook(
-                    playbook: 'ubuntu-playbook.yml',
-                    inventory: 'inventory.yaml',
+                    playbook: 'ansible/backend.yml',
+                    inventory: 'ansible/inventory.ini',
                     credentialsId: 'jenkins-key',
                     disableHostKeyChecking: true,
                     installation: 'ansible',
-                    become: true,
-                    extraVars: [
-                        ansible_user: "ubuntu"
-                    ]
+                    become: true
                 )
             }
         }
@@ -67,14 +81,11 @@ pipeline {
         stage('Post-checks') {
             steps {
                 script {
-                    def backend_ip = sh(returnStdout: true, script: "terraform output -raw backend_public_ip").trim()
-                    def frontend_ip = sh(returnStdout: true, script: "terraform output -raw frontend_public_ip").trim()
+                    echo "Frontend URL → http://${env.FRONTEND_IP}"
+                    echo "Backend (Netdata) URL → http://${env.BACKEND_IP}:19999"
 
-                    echo "Frontend IP: ${frontend_ip}"
-                    echo "Backend IP: ${backend_ip}"
-
-                    sh "curl -m 10 -I http://${frontend_ip} || true"
-                    sh "curl -m 10 -I http://${backend_ip}:19999 || true"
+                    sh "curl -m 5 -I http://${env.FRONTEND_IP} || true"
+                    sh "curl -m 5 -I http://${env.BACKEND_IP}:19999 || true"
                 }
             }
         }
