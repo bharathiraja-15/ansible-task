@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         TF_VAR_key_name = 'firstserver'
+        TF_VAR_key_name = 'firstserver-key'
     }
 
     stages {
