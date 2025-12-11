@@ -54,29 +54,30 @@ backend ansible_host=${env.BACKEND_IP} ansible_user=ubuntu
             }
         }
 
-        stage('Run Ansible - Frontend') {
-            steps {
-                ansiblePlaybook(
-                    playbook: 'ansible/frontend.yml',
-                    inventory: 'ansible/inventory.ini',
-                    credentialsId: 'jenkins-key',
-                    disableHostKeyChecking: true,
-                    become: true
-                )
-            }
-        }
+       stage('Run Ansible - Frontend') {
+    steps {
+        ansiblePlaybook(
+            playbook: 'amazon-playbook.yml',
+            inventory: 'ansible/inventory.ini',
+            credentialsId: 'jenkins-key',
+            disableHostKeyChecking: true,
+            become: true
+        )
+    }
+}
 
-        stage('Run Ansible - Backend') {
-            steps {
-                ansiblePlaybook(
-                    playbook: 'ansible/backend.yml',
-                    inventory: 'ansible/inventory.ini',
-                    credentialsId: 'jenkins-key',
-                    disableHostKeyChecking: true,
-                    become: true
-                )
-            }
-        }
+stage('Run Ansible - Backend') {
+    steps {
+        ansiblePlaybook(
+            playbook: 'ubuntu-playbook.yml',
+            inventory: 'ansible/inventory.ini',
+            credentialsId: 'jenkins-key',
+            disableHostKeyChecking: true,
+            become: true
+        )
+    }
+}
+
 
         stage('Post-checks') {
             steps {
