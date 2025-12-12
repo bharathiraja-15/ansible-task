@@ -70,7 +70,7 @@ resource "aws_security_group" "app_sg" {
 # Backend (Ubuntu)
 # ---------------------------
 resource "aws_instance" "backend" {
-  ami                         = "ami-0b46816ffa1234887"
+  ami                         = "ami-0fa91bc90632c73c9"
   instance_type               = "t3.micro"
   key_name                    = var.key_name
   subnet_id                   = var.subnet_id
